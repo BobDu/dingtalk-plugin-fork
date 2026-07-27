@@ -17,6 +17,10 @@ public class DingTalkStepListener implements StepListener {
   public void notifyOfNewStep(@NonNull Step step, @NonNull StepContext context) {
     try {
       Run<?, ?> run = context.get(Run.class);
+      if (run == null || run.getParent().getProperty(DingTalkJobProperty.class) == null) {
+        // 未配置机器人的任务不会发送通知,无需收集其环境变量
+        return;
+      }
       EnvVars vars = context.get(EnvVars.class);
       PipelineEnvContext.merge(run, vars);
     } catch (Exception e) {
