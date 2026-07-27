@@ -2,8 +2,10 @@ package io.jenkins.plugins.context;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 import hudson.EnvVars;
+import hudson.model.Run;
 import org.junit.jupiter.api.Test;
 
 class PipelineEnvContextTest {
@@ -11,65 +13,88 @@ class PipelineEnvContextTest {
   @Test
   void concurrentRunsAreIsolatedByBuild() {
     // 复现 #366:两个并发构建使用相同的变量名,彼此不应互相覆盖。
-    PipelineEnvContext.mergeById("job/a#1", new EnvVars("FOO", "value-a"));
-    PipelineEnvContext.mergeById("job/b#1", new EnvVars("FOO", "value-b"));
+    Run<?, ?> a = mock(Run.class);
+    Run<?, ?> b = mock(Run.class);
 
-    assertEquals("value-a", PipelineEnvContext.getById("job/a#1").get("FOO"));
-    assertEquals("value-b", PipelineEnvContext.getById("job/b#1").get("FOO"));
+    PipelineEnvContext.merge(a, new EnvVars("FOO", "value-a"));
+    PipelineEnvContext.merge(b, new EnvVars("FOO", "value-b"));
 
-    PipelineEnvContext.resetById("job/a#1");
-    PipelineEnvContext.resetById("job/b#1");
+    assertEquals("value-a", PipelineEnvContext.get(a).get("FOO"));
+    assertEquals("value-b", PipelineEnvContext.get(b).get("FOO"));
+
+    PipelineEnvContext.reset(a);
+    PipelineEnvContext.reset(b);
   }
 
   @Test
   void resetOnlyClearsTargetBuild() {
-    PipelineEnvContext.mergeById("job/a#2", new EnvVars("K", "a"));
-    PipelineEnvContext.mergeById("job/b#2", new EnvVars("K", "b"));
+    Run<?, ?> a = mock(Run.class);
+    Run<?, ?> b = mock(Run.class);
+    PipelineEnvContext.merge(a, new EnvVars("K", "a"));
+    PipelineEnvContext.merge(b, new EnvVars("K", "b"));
 
-    PipelineEnvContext.resetById("job/a#2");
+    PipelineEnvContext.reset(a);
 
-    assertTrue(PipelineEnvContext.getById("job/a#2").isEmpty());
-    assertEquals("b", PipelineEnvContext.getById("job/b#2").get("K"));
+    assertTrue(PipelineEnvContext.get(a).isEmpty());
+    assertEquals("b", PipelineEnvContext.get(b).get("K"));
 
-    PipelineEnvContext.resetById("job/b#2");
+    PipelineEnvContext.reset(b);
   }
 
   @Test
   void mergeAccumulatesWithinSameBuild() {
-    PipelineEnvContext.mergeById("job/a#3", new EnvVars("A", "1"));
-    PipelineEnvContext.mergeById("job/a#3", new EnvVars("B", "2"));
+    Run<?, ?> a = mock(Run.class);
+    PipelineEnvContext.merge(a, new EnvVars("A", "1"));
+    PipelineEnvContext.merge(a, new EnvVars("B", "2"));
 
-    EnvVars merged = PipelineEnvContext.getById("job/a#3");
+    EnvVars merged = PipelineEnvContext.get(a);
     assertEquals("1", merged.get("A"));
     assertEquals("2", merged.get("B"));
 
-    PipelineEnvContext.resetById("job/a#3");
+    PipelineEnvContext.reset(a);
   }
 
   @Test
   void getReturnsDefensiveCopy() {
-    PipelineEnvContext.mergeById("job/a#4", new EnvVars("K", "original"));
+    Run<?, ?> a = mock(Run.class);
+    PipelineEnvContext.merge(a, new EnvVars("K", "original"));
 
-    PipelineEnvContext.getById("job/a#4").put("K", "mutated");
+    PipelineEnvContext.get(a).put("K", "mutated");
 
-    assertEquals("original", PipelineEnvContext.getById("job/a#4").get("K"));
+    assertEquals("original", PipelineEnvContext.get(a).get("K"));
 
-    PipelineEnvContext.resetById("job/a#4");
+    PipelineEnvContext.reset(a);
   }
 
   @Test
   void mergeDoesNotMutateAlreadyReturnedSnapshot() {
     // EnvVars 继承自 TreeMap,不是线程安全的;已经交出去的快照不能被后续合并就地改写,
     // 否则并发读取时会拿到撕裂的数据。
-    PipelineEnvContext.mergeById("job/a#6", new EnvVars("K", "v1"));
-    EnvVars snapshot = PipelineEnvContext.getById("job/a#6");
+    Run<?, ?> a = mock(Run.class);
+    PipelineEnvContext.merge(a, new EnvVars("K", "v1"));
+    EnvVars snapshot = PipelineEnvContext.get(a);
 
-    PipelineEnvContext.mergeById("job/a#6", new EnvVars("K", "v2"));
+    PipelineEnvContext.merge(a, new EnvVars("K", "v2"));
 
     assertEquals("v1", snapshot.get("K"));
-    assertEquals("v2", PipelineEnvContext.getById("job/a#6").get("K"));
+    assertEquals("v2", PipelineEnvContext.get(a).get("K"));
 
-    PipelineEnvContext.resetById("job/a#6");
+    PipelineEnvContext.reset(a);
+  }
+
+  @Test
+  void entriesAreKeyedByBuildIdentityNotByName() {
+    // 键按引用比较,因此两个构建即便对外标识相同也不会串号,
+    // 任务改名或移动也不会让已缓存的环境变量失联。
+    Run<?, ?> a = mock(Run.class);
+    Run<?, ?> b = mock(Run.class);
+
+    PipelineEnvContext.merge(a, new EnvVars("K", "a"));
+
+    assertTrue(PipelineEnvContext.get(b).isEmpty());
+    assertEquals("a", PipelineEnvContext.get(a).get("K"));
+
+    PipelineEnvContext.reset(a);
   }
 
   @Test
@@ -81,8 +106,9 @@ class PipelineEnvContextTest {
 
   @Test
   void mergeIgnoresNullValue() {
-    PipelineEnvContext.mergeById("job/a#5", null);
-    assertTrue(PipelineEnvContext.getById("job/a#5").isEmpty());
-    PipelineEnvContext.resetById("job/a#5");
+    Run<?, ?> a = mock(Run.class);
+    PipelineEnvContext.merge(a, null);
+    assertTrue(PipelineEnvContext.get(a).isEmpty());
+    PipelineEnvContext.reset(a);
   }
 }
