@@ -16,11 +16,8 @@ import java.util.Map;
  */
 public class PipelineEnvContext {
 
-	private static final Map<Run<?, ?>, EnvVars> STORE =
+	private static final Map<Run<?, ?>, EnvVars> store =
 			Caffeine.newBuilder().weakKeys().<Run<?, ?>, EnvVars>build().asMap();
-
-	private PipelineEnvContext() {
-	}
 
 	public static void merge(Run<?, ?> run, EnvVars value) {
 		if (run == null || value == null) {
@@ -28,7 +25,7 @@ public class PipelineEnvContext {
 		}
 		// 每次合并都产生新的快照:EnvVars 继承自 TreeMap,并非线程安全,
 		// 已发布的实例不能再就地修改,否则并发读取时会拿到撕裂的数据。
-		STORE.compute(run, (key, current) -> {
+		store.compute(run, (key, current) -> {
 			EnvVars merged = current == null ? new EnvVars() : new EnvVars(current);
 			merged.overrideAll(value);
 			return merged;
@@ -36,13 +33,13 @@ public class PipelineEnvContext {
 	}
 
 	public static EnvVars get(Run<?, ?> run) {
-		EnvVars current = run == null ? null : STORE.get(run);
+		EnvVars current = run == null ? null : store.get(run);
 		return current == null ? new EnvVars() : new EnvVars(current);
 	}
 
 	public static void reset(Run<?, ?> run) {
 		if (run != null) {
-			STORE.remove(run);
+			store.remove(run);
 		}
 	}
 }
