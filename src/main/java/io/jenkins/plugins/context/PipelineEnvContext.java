@@ -23,18 +23,25 @@ public class PipelineEnvContext {
 		if (run == null || value == null) {
 			return;
 		}
-		// 每次合并都产生新的快照:EnvVars 继承自 TreeMap,并非线程安全,
-		// 已发布的实例不能再就地修改,否则并发读取时会拿到撕裂的数据。
 		store.compute(run, (key, current) -> {
-			EnvVars merged = current == null ? new EnvVars() : new EnvVars(current);
+			EnvVars merged = current == null ? new EnvVars() : current;
 			merged.overrideAll(value);
 			return merged;
 		});
 	}
 
 	public static EnvVars get(Run<?, ?> run) {
-		EnvVars current = run == null ? null : store.get(run);
-		return current == null ? new EnvVars() : new EnvVars(current);
+		EnvVars snapshot = new EnvVars();
+		if (run != null) {
+			// EnvVars 继承自 TreeMap,并非线程安全,因此在与 merge 相同的原子操作内取快照。
+			store.compute(run, (key, current) -> {
+				if (current != null) {
+					snapshot.putAll(current);
+				}
+				return current;
+			});
+		}
+		return snapshot;
 	}
 
 	public static void reset(Run<?, ?> run) {
