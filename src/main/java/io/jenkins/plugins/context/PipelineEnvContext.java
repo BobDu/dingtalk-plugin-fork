@@ -39,8 +39,10 @@ public class PipelineEnvContext {
 		if (id == null || value == null) {
 			return;
 		}
+		// 每次合并都产生新的快照:EnvVars 继承自 TreeMap,并非线程安全,
+		// 已发布的实例不能再就地修改,否则并发读取时会拿到撕裂的数据。
 		STORE.compute(id, (key, current) -> {
-			EnvVars merged = current == null ? new EnvVars() : current;
+			EnvVars merged = current == null ? new EnvVars() : new EnvVars(current);
 			merged.overrideAll(value);
 			return merged;
 		});

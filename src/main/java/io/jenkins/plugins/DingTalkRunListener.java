@@ -65,6 +65,17 @@ public class DingTalkRunListener extends RunListener<Run<?, ?>> {
 		}
 	}
 
+	@Override
+	public void onFinalized(Run<?, ?> run) {
+		// 兜底:onCompleted 未触发的构建结束路径也要释放缓存的环境变量
+		PipelineEnvContext.reset(run);
+	}
+
+	@Override
+	public void onDeleted(Run<?, ?> run) {
+		PipelineEnvContext.reset(run);
+	}
+
 	private NoticeOccasionEnum getNoticeOccasion(Result result) {
 		if (Result.SUCCESS.equals(result)) {
 			return NoticeOccasionEnum.SUCCESS;

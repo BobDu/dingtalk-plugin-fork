@@ -58,6 +58,21 @@ class PipelineEnvContextTest {
   }
 
   @Test
+  void mergeDoesNotMutateAlreadyReturnedSnapshot() {
+    // EnvVars 继承自 TreeMap,不是线程安全的;已经交出去的快照不能被后续合并就地改写,
+    // 否则并发读取时会拿到撕裂的数据。
+    PipelineEnvContext.mergeById("job/a#6", new EnvVars("K", "v1"));
+    EnvVars snapshot = PipelineEnvContext.getById("job/a#6");
+
+    PipelineEnvContext.mergeById("job/a#6", new EnvVars("K", "v2"));
+
+    assertEquals("v1", snapshot.get("K"));
+    assertEquals("v2", PipelineEnvContext.getById("job/a#6").get("K"));
+
+    PipelineEnvContext.resetById("job/a#6");
+  }
+
+  @Test
   void nullRunIsHandledGracefully() {
     PipelineEnvContext.merge(null, new EnvVars("X", "1"));
     assertTrue(PipelineEnvContext.get(null).isEmpty());
