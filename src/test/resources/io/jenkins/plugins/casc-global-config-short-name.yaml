@@ -1,0 +1,7 @@
+unclassified:
+  dingtalk:
+    verbose: true
+    robotConfigs:
+      - id: "robot-from-short-name"
+        name: "Robot from the short name"
+        webhook: "https://oapi.dingtalk.com/robot/send?access_token=short-name-token"

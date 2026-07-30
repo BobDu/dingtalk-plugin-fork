@@ -86,6 +86,10 @@ export default defineConfig({
           {
             text: '环境变量',
             link: '/guide/environment-variables'
+          },
+          {
+            text: 'Configuration as Code',
+            link: '/guide/configuration-as-code'
           }
         ]
       },

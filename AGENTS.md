@@ -40,6 +40,7 @@
 - When adding a new config field, update the matching `config.jelly`, `help-*.html`, and defaults (for example, `DingTalkJobPropertyDescriptor.getDefaultNotifierConfigs()`).
 - UI resources follow the plugin class path, e.g., `DingTalkRobotConfig` -> `src/main/resources/io/jenkins/plugins/DingTalkRobotConfig/config.jelly`.
 - Resource/localization files should be UTF-8 (no Unicode escape sequences), for example `Messages_zh_CN.properties` should contain direct Chinese text.
+- The global settings live on their own `ManagementLink` page, not on /configure. `DingTalkGlobalConfig#getGlobalConfigPage` exists only so Configuration as Code discovers them under `unclassified`, and `HideFromGlobalConfigurationPage` keeps them off /configure; dropping either one breaks JCasC or puts a second, broken copy of the form on /configure.
 
 ## Testing Guidelines
 - Tests use JUnit 5 (`org.junit.jupiter`).

@@ -20,7 +20,8 @@
 
 ## 机器人配置
 
-在 `Configure System` 中找到 `钉钉配置` 选项卡，根据自己的需求选择 `通知时机`，然后添加机器人即可
+在 `Manage Jenkins` → `钉钉` 中根据自己的需求选择 `通知时机`，然后添加机器人即可。
+也可以用 [Configuration as Code](./configuration-as-code.md) 管理这些配置
 
 示例截图：
 ::: details

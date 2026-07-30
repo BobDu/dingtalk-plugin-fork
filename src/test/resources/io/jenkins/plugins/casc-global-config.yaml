@@ -1,0 +1,19 @@
+unclassified:
+  dingTalkGlobalConfig:
+    verbose: true
+    noticeOccasions:
+      - "START"
+      - "FAILURE"
+    proxyConfig:
+      type: "HTTP"
+      host: "proxy.example.com"
+      port: 8080
+    robotConfigs:
+      - id: "robot-from-casc"
+        name: "Robot from CasC"
+        webhook: "https://oapi.dingtalk.com/robot/send?access_token=casc-token"
+        securityPolicyConfigs:
+          - type: "KEY"
+            value: "jenkins-keyword"
+          - type: "SECRET"
+            value: "SECsigningsecret"

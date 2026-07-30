@@ -1,8 +1,11 @@
 package io.jenkins.plugins;
 
+import edu.umd.cs.findbugs.annotations.CheckForNull;
+import edu.umd.cs.findbugs.annotations.NonNull;
 import hudson.Extension;
 import hudson.model.Describable;
 import hudson.model.Descriptor;
+import hudson.model.DescriptorVisibilityFilter;
 import io.jenkins.plugins.DingTalkRobotConfig.DingTalkRobotConfigDescriptor;
 import io.jenkins.plugins.enums.NoticeOccasionEnum;
 import io.jenkins.plugins.model.NoticeOccasionOption;
@@ -35,7 +38,13 @@ import org.kohsuke.stapler.StaplerRequest2;
 @Getter
 @ToString
 @Extension
-@Symbol("dingtalk")
+// Configuration as Code accepts any of these names and writes the first, and it raises an
+// administrative monitor for a name matched through any of the others. dingTalkGlobalConfig is the
+// one it derived from the class name for 2.4.7 and earlier, and so the only one that has ever
+// resolved to these settings in a release: dingtalk was added along with the change that made them
+// unreachable. It leads for that reason, so that a configuration written back then keeps loading
+// without also being told it is obsolete.
+@Symbol({"dingTalkGlobalConfig", "dingtalk"})
 public class DingTalkGlobalConfig extends Descriptor<DingTalkGlobalConfig> implements
     Describable<DingTalkGlobalConfig> {
   private static final int NOTICE_OCCASION_COLUMNS = 3;
@@ -150,6 +159,39 @@ public class DingTalkGlobalConfig extends Descriptor<DingTalkGlobalConfig> imple
     return this;
   }
 
+  /**
+   * Makes this descriptor part of the unclassified global configuration.
+   *
+   * <p>Configuration as Code reads the {@code unclassified} root from the descriptors that report a
+   * global config page ({@code GlobalConfigurationCategoryConfigurator}), which is what
+   * {@link jenkins.model.GlobalConfiguration} provides by returning its config page here. This class
+   * stopped extending that when the settings moved to their own management page, and with it the
+   * plugin silently dropped out of {@code unclassified} — the page is still the same one, so it is
+   * reported the same way. {@link HideFromGlobalConfigurationPage} keeps it off /configure.
+   */
+  @Override
+  public String getGlobalConfigPage() {
+    return getConfigPage();
+  }
+
+  /**
+   * Keeps the settings out of Jenkins' own configuration page.
+   *
+   * <p>{@link #getGlobalConfigPage()} would otherwise place them there as well as on the management
+   * page, which is both a duplicate and broken: the robot form's nested lists resolve their
+   * descriptors from the surrounding context, and under /configure that context is Jenkins itself.
+   * Only the global configuration listings pass a Jenkins context to a visibility filter, so this
+   * hides the descriptor from them and from nothing else — including from the submit loop, which
+   * would otherwise hand {@link #configure} the empty form it never rendered.
+   */
+  @Extension
+  public static class HideFromGlobalConfigurationPage extends DescriptorVisibilityFilter {
+
+    @Override
+    public boolean filter(@CheckForNull Object context, @NonNull Descriptor descriptor) {
+      return !(context instanceof Jenkins && descriptor instanceof DingTalkGlobalConfig);
+    }
+  }
 
   /**
    * `网络代理` 配置页面
